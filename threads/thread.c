@@ -143,6 +143,24 @@ thread_tick (void)
     else
         kernel_ticks++;
 
+    if (thread_mlfqs) {
+
+    }
+    else {
+   	struct list_elem *e = list_begin(&ready_list);
+	while (e != list_end(&ready_list)) {
+		struct thread *tr = list_entry(e, struct thread, elem);
+		tr->age++;
+		if (tr->age >= 20 && tr->priority <= PRI_DEFAULT) {
+			tr->priority++;
+			tr->age = 0;
+			e = list_remove(e);
+			list_insert_ordered(&ready_list, &tr->elem, thread_comparator, 0);
+		}
+		else
+			e = list_next(e);
+	}
+    }		
     /* Enforce preemption. */
     if (++thread_ticks >= TIME_SLICE)
         intr_yield_on_return ();
@@ -255,6 +273,7 @@ thread_unblock (struct thread *t)
 
     old_level = intr_disable ();
     ASSERT (t->status == THREAD_BLOCKED);
+    t->age = 0;
     list_insert_ordered(&ready_list, &t->elem, thread_comparator, 0);	
     t->status = THREAD_READY;
     intr_set_level (old_level);
@@ -381,8 +400,10 @@ thread_yield (void)
     ASSERT (!intr_context ());
 
     old_level = intr_disable ();
-    if (cur != idle_thread)
+    if (cur != idle_thread) {
+       cur->age = 0;	
        list_insert_ordered(&ready_list, &cur->elem, thread_comparator, 0); 
+    }
     cur->status = THREAD_READY;
     schedule ();
     intr_set_level (old_level);
@@ -537,6 +558,10 @@ init_thread (struct thread *t, const char *name, int priority)
     t->stack = (uint8_t *)t + PGSIZE;
     t->priority = priority;
     t->magic = THREAD_MAGIC;
+    t->age = 0;	
+    if (thread_mlfqs) {
+	
+    }
     list_push_back (&all_list, &t->allelem);
 }
 

@@ -145,4 +145,5 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+bool thread_comparator(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
 #endif /* threads/thread.h */
