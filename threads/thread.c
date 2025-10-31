@@ -75,6 +75,10 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+bool thread_comparator(struct list_elem *a, struct list_elem *b, void *aux UNUSED) {
+        return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
+} 
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -213,7 +217,7 @@ thread_create (const char *name, int priority,
 
     /* Add to run queue. */
     thread_unblock (t);
-    if (list_empty(&ready_list) == FALSE && thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
+    if (!list_empty(&ready_list) && thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
 	thread_yield();
     return tid;
 }
@@ -406,7 +410,7 @@ void
 thread_set_priority (int new_priority)
 {
     thread_current ()->priority = new_priority;
-    if (list_empty(&ready_list) && thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
+    if (!list_empty(&ready_list) && thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
 	thread_yield();
 }
 
@@ -649,7 +653,3 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
-
-bool thread_comparator(struct list_elem *a, struct list_elem *b, void *aux UNUSED) {
-	return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
-}  
