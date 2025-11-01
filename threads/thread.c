@@ -142,7 +142,9 @@ thread_tick (void)
 #endif
     else
         kernel_ticks++;
-
+    int64_t sum_ticks = idle_ticks + user_ticks + kernel_ticks;
+    if (sum_ticks >= get_next_tick_to_wakeup())
+	thread_wakeup(sum_ticks);	
     if (thread_mlfqs) {
 
     }
@@ -151,7 +153,7 @@ thread_tick (void)
 	while (e != list_end(&ready_list)) {
 		struct thread *tr = list_entry(e, struct thread, elem);
 		tr->age++;
-		if (tr->age >= 20 && tr->priority <= PRI_DEFAULT) {
+		if (tr->age >= 20 && tr->priority < PRI_DEFAULT) {
 			tr->priority++;
 			tr->age = 0;
 			e = list_remove(e);
@@ -231,12 +233,12 @@ thread_create (const char *name, int priority,
     sf->eip = switch_entry;
     sf->ebp = 0;
 
-    intr_set_level (old_level);
+    
 
     /* Add to run queue. */
     thread_unblock (t);
-    if (!list_empty(&ready_list) && thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
-	thread_yield();
+    priority_check();
+    intr_set_level(old_level);
     return tid;
 }
 
@@ -409,6 +411,14 @@ thread_yield (void)
     intr_set_level (old_level);
 }
 
+void priority_check() {
+	ASSERT(intr_get_level() == INTR_OFF);
+	if (thread_mlfqs || list_empty(&ready_list))
+		return;
+	struct thread *ready_thread = list_entry(list_front(&ready_list), struct thread, elem);
+	if (thread_current()->priority < ready_thread->priority)
+		thread_yield();
+}
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -430,9 +440,10 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
+    enum intr_level old_level = intr_disable();
     thread_current ()->priority = new_priority;
-    if (!list_empty(&ready_list) && thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
-	thread_yield();
+    priority_check();
+    intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
